@@ -308,53 +308,80 @@ class SIFA:
     def train(self):
 
         # Load Dataset
+        print("Loading training data...")
         self.inputs = data_loader.load_data(self._source_train_pth, self._target_train_pth, True)
+        print("Loading validation data...")
         self.inputs_val = data_loader.load_data(self._source_val_pth, self._target_val_pth, True)
 
         # Build the network
+        print("Building the model...")
         self.model_setup()
+        print("Model setup complete.")
 
         # Loss function calculations
+        print("Computing loss functions...")
         self.compute_losses()
+        print("Loss functions computed.")
 
         # Initializing the global variables
+        print("Initializing TensorFlow variables...")
         init = (tf.global_variables_initializer(),
                 tf.local_variables_initializer())
-        saver = tf.train.Saver(max_to_keep=40)
+        print("TensorFlow variables initialized.")
 
+        # Setup model saver
+        print("Setting up model saver...")
+        saver = tf.train.Saver(max_to_keep=40)
+        print("Model saver created.")
+
+        # Read training file paths
+        print(f"Reading source training paths from: {self._source_train_pth}")
         with open(self._source_train_pth, 'r') as fp:
             rows_s = fp.readlines()
+        print("Source training paths loaded.")
+
+        print(f"Reading target training paths from: {self._target_train_pth}")
         with open(self._target_train_pth, 'r') as fp:
             rows_t = fp.readlines()
+        print("Target training paths loaded.")
 
+        print("Configuring GPU session...")
         gpu_options = tf.GPUOptions(allow_growth=True)
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
+            print("Initializing variables...")
             sess.run(init)
 
             # Restore the model to run the model from last checkpoint
             if self._to_restore:
+                print("Restoring from checkpoint...")
                 chkpt_fname = tf.train.latest_checkpoint(self._checkpoint_dir)
                 saver.restore(sess, chkpt_fname)
+                print(f"Checkpoint restored from {chkpt_fname}")
 
+            print("Setting up summary writers...")
             writer = tf.summary.FileWriter(self._output_dir)
-            writer_val = tf.summary.FileWriter(self._output_dir+'/val')
+            writer_val = tf.summary.FileWriter(self._output_dir + '/val')
 
             if not os.path.exists(self._output_dir):
+                print(f"Creating output directory: {self._output_dir}")
                 os.makedirs(self._output_dir)
 
+            print("Starting queue runners...")
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(coord=coord)
 
             # Training Loop
+            print("Starting training loop...")
             curr_lr_seg = 0.001
             cnt = -1
 
             for i in range(self._max_step):
+                print(f"Step {i+1}/{self._max_step} started.")
                 starttime = time.time()
-
                 cnt += 1
                 curr_lr = self._base_lr
 
+                print("Fetching training data batch...")
                 images_i, images_j, gts_i, gts_j = sess.run(self.inputs)
                 inputs = {
                     'images_i': images_i,
@@ -362,6 +389,8 @@ class SIFA:
                     'gts_i': gts_i,
                     'gts_j': gts_j,
                 }
+
+                print("Fetching validation data batch...")
                 images_i_val, images_j_val, gts_i_val, gts_j_val = sess.run(self.inputs_val)
                 inputs_val = {
                     'images_i_val': images_i_val,
@@ -370,21 +399,16 @@ class SIFA:
                     'gts_j_val': gts_j_val,
                 }
 
-                # Optimizing the G_A network
+                print("Training G_A network...")
                 _, fake_B_temp, summary_str = sess.run(
-                    [self.g_A_trainer,
-                     self.fake_images_b,
-                     self.g_A_loss_summ],
+                    [self.g_A_trainer, self.fake_images_b, self.g_A_loss_summ],
                     feed_dict={
-                        self.input_a:
-                            inputs['images_i'],
-                        self.input_b:
-                            inputs['images_j'],
-                        self.gt_a:
-                            inputs['gts_i'],
+                        self.input_a: inputs['images_i'],
+                        self.input_b: inputs['images_j'],
+                        self.gt_a: inputs['gts_i'],
                         self.learning_rate_gan: curr_lr,
-                        self.keep_rate:self._keep_rate_value,
-                        self.is_training:self._is_training_value,
+                        self.keep_rate: self._keep_rate_value,
+                        self.is_training: self._is_training_value,
                     }
                 )
                 writer.add_summary(summary_str, cnt)
@@ -392,14 +416,12 @@ class SIFA:
                 fake_B_temp1 = self.fake_image_pool(
                     self.num_fake_inputs, fake_B_temp, self.fake_images_B)
 
-                # Optimizing the D_B network
+                print("Training D_B network...")
                 _, summary_str = sess.run(
                     [self.d_B_trainer, self.d_B_loss_summ],
                     feed_dict={
-                        self.input_a:
-                            inputs['images_i'],
-                        self.input_b:
-                            inputs['images_j'],
+                        self.input_a: inputs['images_i'],
+                        self.input_b: inputs['images_j'],
                         self.learning_rate_gan: curr_lr,
                         self.fake_pool_B: fake_B_temp1,
                         self.keep_rate: self._keep_rate_value,
@@ -408,34 +430,26 @@ class SIFA:
                 )
                 writer.add_summary(summary_str, cnt)
 
-                # Optimizing the S_B network
+                print("Training S_B network...")
                 _, summary_str = sess.run(
                     [self.s_B_trainer, self.s_B_loss_merge_summ],
                     feed_dict={
-                        self.input_a:
-                            inputs['images_i'],
-                        self.input_b:
-                            inputs['images_j'],
-                        self.gt_a:
-                            inputs['gts_i'],
+                        self.input_a: inputs['images_i'],
+                        self.input_b: inputs['images_j'],
+                        self.gt_a: inputs['gts_i'],
                         self.learning_rate_seg: curr_lr,
                         self.keep_rate: self._keep_rate_value,
                         self.is_training: self._is_training_value,
                     }
-
                 )
                 writer.add_summary(summary_str, cnt)
 
-                # Optimizing the G_B network
+                print("Training G_B network...")
                 _, fake_A_temp, summary_str = sess.run(
-                    [self.g_B_trainer,
-                     self.fake_images_a,
-                     self.g_B_loss_summ],
+                    [self.g_B_trainer, self.fake_images_a, self.g_B_loss_summ],
                     feed_dict={
-                        self.input_a:
-                            inputs['images_i'],
-                        self.input_b:
-                            inputs['images_j'],
+                        self.input_a: inputs['images_i'],
+                        self.input_b: inputs['images_j'],
                         self.learning_rate_gan: curr_lr,
                         self.gt_a: inputs['gts_i'],
                         self.keep_rate: self._keep_rate_value,
@@ -447,14 +461,12 @@ class SIFA:
                 fake_A_temp1 = self.fake_image_pool(
                     self.num_fake_inputs, fake_A_temp, self.fake_images_A)
 
-                # Optimizing the D_A network
+                print("Training D_A network...")
                 _, summary_str = sess.run(
                     [self.d_A_trainer, self.d_A_loss_summ],
                     feed_dict={
-                        self.input_a:
-                            inputs['images_i'],
-                        self.input_b:
-                            inputs['images_j'],
+                        self.input_a: inputs['images_i'],
+                        self.input_b: inputs['images_j'],
                         self.learning_rate_gan: curr_lr,
                         self.fake_pool_A: fake_A_temp1,
                         self.keep_rate: self._keep_rate_value,
@@ -463,14 +475,12 @@ class SIFA:
                 )
                 writer.add_summary(summary_str, cnt)
 
-                # Optimizing the D_P network
+                print("Training D_P network...")
                 _, summary_str = sess.run(
                     [self.d_P_trainer, self.d_P_loss_summ],
                     feed_dict={
-                        self.input_a:
-                            inputs['images_i'],
-                        self.input_b:
-                            inputs['images_j'],
+                        self.input_a: inputs['images_i'],
+                        self.input_b: inputs['images_j'],
                         self.learning_rate_gan: curr_lr,
                         self.keep_rate: self._keep_rate_value,
                         self.is_training: self._is_training_value,
@@ -478,14 +488,12 @@ class SIFA:
                 )
                 writer.add_summary(summary_str, cnt)
 
-                # Optimizing the D_P_ll network
+                print("Training D_P_ll network...")
                 _, summary_str = sess.run(
                     [self.d_P_ll_trainer, self.d_P_ll_loss_summ],
                     feed_dict={
-                        self.input_a:
-                            inputs['images_i'],
-                        self.input_b:
-                            inputs['images_j'],
+                        self.input_a: inputs['images_i'],
+                        self.input_b: inputs['images_j'],
                         self.learning_rate_gan: curr_lr,
                         self.keep_rate: self._keep_rate_value,
                         self.is_training: self._is_training_value,
@@ -493,37 +501,41 @@ class SIFA:
                 )
                 writer.add_summary(summary_str, cnt)
 
-                summary_str_gan, summary_str_seg = sess.run([self.lr_gan_summ, self.lr_seg_summ],
-                         feed_dict={
-                             self.learning_rate_gan: curr_lr,
-                             self.learning_rate_seg: curr_lr_seg,
-                         })
-
+                print("Logging learning rates...")
+                summary_str_gan, summary_str_seg = sess.run(
+                    [self.lr_gan_summ, self.lr_seg_summ],
+                    feed_dict={
+                        self.learning_rate_gan: curr_lr,
+                        self.learning_rate_seg: curr_lr_seg,
+                    })
                 writer.add_summary(summary_str_gan, cnt)
                 writer.add_summary(summary_str_seg, cnt)
 
                 writer.flush()
                 self.num_fake_inputs += 1
 
-                print ('iter {}: processing time {}'.format(cnt, time.time() - starttime))
-                
-                # batch evaluation
+                print(f"iter {cnt}: processing time {time.time() - starttime:.2f}s")
+
+                # Evaluation
                 if (i + 1) % evaluation_interval == 0:
-                    summary_str_fake_b, summary_str_b = sess.run([self.dice_fake_b_mean_summ, self.dice_b_mean_summ],
-                                                                 feed_dict={
-                                                                     self.input_a: inputs['images_i'],
-                                                                     self.gt_a: inputs['gts_i'],
-                                                                     self.input_b: inputs['images_j'],
-                                                                     self.gt_b: inputs['gts_j'],
-                                                                     self.is_training: False,
-                                                                     self.keep_rate: 1.0,
-                                                                 })
+                    print("Running evaluation...")
+                    summary_str_fake_b, summary_str_b = sess.run(
+                        [self.dice_fake_b_mean_summ, self.dice_b_mean_summ],
+                        feed_dict={
+                            self.input_a: inputs['images_i'],
+                            self.gt_a: inputs['gts_i'],
+                            self.input_b: inputs['images_j'],
+                            self.gt_b: inputs['gts_j'],
+                            self.is_training: False,
+                            self.keep_rate: 1.0,
+                        })
                     writer.add_summary(summary_str_fake_b, cnt)
                     writer.add_summary(summary_str_b, cnt)
                     writer.flush()
 
                     summary_str = sess.run(
-                        self.dice_fake_b_mean_summ, feed_dict={
+                        self.dice_fake_b_mean_summ,
+                        feed_dict={
                             self.input_a: inputs_val['images_i_val'],
                             self.gt_a: inputs_val['gts_i_val'],
                             self.is_training: False,
@@ -531,16 +543,20 @@ class SIFA:
                         })
                     writer_val.add_summary(summary_str, cnt)
                     writer_val.flush()
+                    print("Evaluation complete.")
 
-                if (cnt+1) % save_interval ==0:
-
+                # Save checkpoint
+                if (cnt + 1) % save_interval == 0:
+                    print("Saving model checkpoint and sample images...")
                     self.save_images(sess, cnt)
-                    saver.save(sess, os.path.join(
-                        self._output_dir, "sifa"), global_step=cnt)
+                    saver.save(sess, os.path.join(self._output_dir, "sifa"), global_step=cnt)
+                    print(f"Checkpoint saved at step {cnt}.")
 
+            print("Training complete. Stopping threads and writing graph...")
             coord.request_stop()
             coord.join(threads)
             writer.add_graph(sess.graph)
+            print("Done.")
 
 
 def main(config_filename):
@@ -551,6 +567,7 @@ def main(config_filename):
         config = json.load(config_file)
 
     sifa_model = SIFA(config)
+    print("start train")
     sifa_model.train()
 
 
