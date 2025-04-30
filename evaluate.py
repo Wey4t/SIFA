@@ -203,24 +203,24 @@ class SIFA:
             dice_mean = np.mean(dice_arr, axis=1)
             dice_std = np.std(dice_arr, axis=1)
 
-            print 'Dice:'
-            print 'AA :%.1f(%.1f)' % (dice_mean[3], dice_std[3])
-            print 'LAC:%.1f(%.1f)' % (dice_mean[1], dice_std[1])
-            print 'LVC:%.1f(%.1f)' % (dice_mean[2], dice_std[2])
-            print 'Myo:%.1f(%.1f)' % (dice_mean[0], dice_std[0])
-            print 'Mean:%.1f' % np.mean(dice_mean)
+            print ('Dice:')
+            print ('AA :%.1f(%.1f)' % (dice_mean[3], dice_std[3]))
+            print ('LAC:%.1f(%.1f)' % (dice_mean[1], dice_std[1]))
+            print ('LVC:%.1f(%.1f)' % (dice_mean[2], dice_std[2]))
+            print ('Myo:%.1f(%.1f)' % (dice_mean[0], dice_std[0]))
+            print ('Mean:%.1f' % np.mean(dice_mean))
 
             assd_arr = np.reshape(assd_list, [4, -1]).transpose()
 
             assd_mean = np.mean(assd_arr, axis=1)
             assd_std = np.std(assd_arr, axis=1)
 
-            print 'ASSD:'
-            print 'AA :%.1f(%.1f)' % (assd_mean[3], assd_std[3])
-            print 'LAC:%.1f(%.1f)' % (assd_mean[1], assd_std[1])
-            print 'LVC:%.1f(%.1f)' % (assd_mean[2], assd_std[2])
-            print 'Myo:%.1f(%.1f)' % (assd_mean[0], assd_std[0])
-            print 'Mean:%.1f' % np.mean(assd_mean)
+            print ('ASSD:')
+            print ('AA :%.1f(%.1f)' % (assd_mean[3], assd_std[3]))
+            print ('LAC:%.1f(%.1f)' % (assd_mean[1], assd_std[1]))
+            print ('LVC:%.1f(%.1f)' % (assd_mean[2], assd_std[2]))
+            print ('Myo:%.1f(%.1f)' % (assd_mean[0], assd_std[0]))
+            print ('Mean:%.1f' % np.mean(assd_mean))
 
 
 def main(config_filename):
