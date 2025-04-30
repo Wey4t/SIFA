@@ -17,3 +17,15 @@ if __name__ == '__main__':
     data_list = './data/datalist/training_mr.txt'
 
     make_datalist(data_fd, data_list)
+    data_fd = './data/training_ct'
+    data_list = './data/datalist/training_ct.txt'
+
+    make_datalist(data_fd, data_list)
+    data_fd = './data/validation_mr'
+    data_list = './data/datalist/validation_mr.txt'
+
+    make_datalist(data_fd, data_list)
+    data_fd = './data/validation_ct'
+    data_list = './data/datalist/validation_ct.txt'
+
+    make_datalist(data_fd, data_list)
